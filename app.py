@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import joblib
 from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.ensemble import RandomForestRegressor
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
@@ -62,17 +63,86 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Load model components (you'll need to save these first)
+def create_demo_model():
+    """Create a simple demo model for deployment"""
+    # Create realistic demo model with proper feature engineering
+    model = RandomForestRegressor(n_estimators=50, random_state=42, max_depth=10)
+    
+    # Create realistic training data that mimics insurance patterns
+    np.random.seed(42)
+    n_samples = 1000
+    
+    # Generate realistic features
+    age = np.random.randint(18, 65, n_samples)
+    bmi = np.random.normal(30, 6, n_samples)
+    children = np.random.poisson(1, n_samples)
+    sex_encoded = np.random.randint(0, 2, n_samples)
+    smoker_encoded = np.random.choice([0, 1], n_samples, p=[0.8, 0.2])
+    region_encoded = np.random.randint(0, 4, n_samples)
+    
+    # Create interaction features
+    age_bmi_interaction = age * bmi
+    bmi_smoker_interaction = bmi * smoker_encoded
+    age_smoker_interaction = age * smoker_encoded
+    
+    # Create categorical features
+    bmi_category = np.where(bmi < 18.5, 0, 
+                   np.where(bmi < 25, 1, 
+                   np.where(bmi < 30, 2, 3)))
+    
+    age_group = np.where(age < 25, 0,
+                np.where(age < 40, 1,
+                np.where(age < 55, 2, 3)))
+    
+    # Combine all features
+    X_dummy = np.column_stack([
+        age, bmi, children, sex_encoded, smoker_encoded, region_encoded,
+        age_bmi_interaction, bmi_smoker_interaction, age_smoker_interaction,
+        bmi_category, age_group
+    ])
+    
+    # Generate realistic charges based on features
+    base_charge = 1000
+    age_factor = age * 50
+    bmi_factor = (bmi - 25) * 100
+    children_factor = children * 500
+    smoker_factor = smoker_encoded * 15000
+    sex_factor = sex_encoded * 200
+    noise = np.random.normal(0, 1000, n_samples)
+    
+    y_dummy = np.abs(base_charge + age_factor + bmi_factor + 
+                     children_factor + smoker_factor + sex_factor + noise)
+    
+    # Train the model
+    model.fit(X_dummy, y_dummy)
+    
+    # Create scaler
+    scaler = StandardScaler()
+    scaler.fit(X_dummy)
+    
+    # Create encoders
+    encoders = {
+        'sex': LabelEncoder().fit(['male', 'female']),
+        'smoker': LabelEncoder().fit(['no', 'yes']),
+        'region': LabelEncoder().fit(['southwest', 'southeast', 'northwest', 'northeast'])
+    }
+    
+    return model, scaler, encoders
+
+# Load model components with fallback to demo model
 @st.cache_resource
 def load_model_components():
     try:
+        # Try to load saved models
         model = joblib.load('best_insurance_model.pkl')
         scaler = joblib.load('feature_scaler.pkl')
         encoders = joblib.load('label_encoders.pkl')
+        st.success("✅ Production model loaded successfully!")
         return model, scaler, encoders
     except FileNotFoundError:
-        st.error("⚠️ Model files not found. Please train the model first!")
-        return None, None, None
+        # Create dummy components for demo purposes
+        st.warning("⚠️ Model files not found. Using demo mode with sample predictions.")
+        return create_demo_model()
 
 # Preprocessing function
 def preprocess_input(age, sex, bmi, children, smoker, region, scaler, encoders):
@@ -139,29 +209,25 @@ def main():
     # Load model components
     model, scaler, encoders = load_model_components()
     
-    if model is None:
-        st.stop()
-    
     # Sidebar for inputs
     st.sidebar.markdown('<h2 class="sub-header">📝 Personal Information</h2>', unsafe_allow_html=True)
 
-# Input fields
+    # Input fields
     age = st.sidebar.slider("👤 Age", min_value=18, max_value=100, value=30, help="Your current age")
 
     sex = st.sidebar.selectbox("⚧ Gender", options=['male', 'female'], index=0, help="Select your gender")
 
     bmi = st.sidebar.number_input("⚖️ BMI (Body Mass Index)", min_value=10.0, max_value=60.0, value=25.0, step=0.1, 
-                              help="Your BMI (weight in kg / height in m²)")
+                                  help="Your BMI (weight in kg / height in m²)")
 
     children = st.sidebar.selectbox("👶 Number of Children", options=[0, 1, 2, 3, 4, 5], index=0, 
-                                help="Number of children covered by insurance")
+                                    help="Number of children covered by insurance")
 
     smoker = st.sidebar.selectbox("🚬 Smoking Status", options=['no', 'yes'], index=0, help="Do you smoke?")
 
     region = st.sidebar.selectbox("🌍 Region", options=['southwest', 'southeast', 'northwest', 'northeast'], 
-                              index=0, help="Your geographical region")
+                                  index=0, help="Your geographical region")
 
-    
     # BMI interpretation
     st.sidebar.markdown("### BMI Categories:")
     if bmi < 18.5:
@@ -214,15 +280,18 @@ def main():
                 # Calculate alternative scenarios
                 if smoker == 'yes':
                     alt_features = preprocess_input(age, sex, bmi, children, 'no', region, scaler, encoders)
-                    scenarios["Non-Smoker"] = model.predict(alt_features)[0]
+                    if alt_features is not None:
+                        scenarios["Non-Smoker"] = model.predict(alt_features)[0]
                 
                 if bmi > 25:
                     alt_features = preprocess_input(age, sex, 24.9, children, smoker, region, scaler, encoders)
-                    scenarios["Normal BMI (24.9)"] = model.predict(alt_features)[0]
+                    if alt_features is not None:
+                        scenarios["Normal BMI (24.9)"] = model.predict(alt_features)[0]
                 
                 if age > 30:
                     alt_features = preprocess_input(25, sex, bmi, children, smoker, region, scaler, encoders)
-                    scenarios["Age 25"] = model.predict(alt_features)[0]
+                    if alt_features is not None:
+                        scenarios["Age 25"] = model.predict(alt_features)[0]
                 
                 # Display scenarios
                 scenario_data = []
@@ -294,9 +363,9 @@ def main():
     with col3:
         st.markdown("""
         **🔧 Model Info:**
-        - Algorithm: Gradient Boosting
-        - Accuracy: 87%+ R² Score
+        - Algorithm: Random Forest (Demo)
         - Features: 11 engineered variables
+        - Mode: Demo/Production
         """)
     
     # Footer
