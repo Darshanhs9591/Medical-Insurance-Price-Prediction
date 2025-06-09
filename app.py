@@ -416,5 +416,5 @@ def main():
         st.error(f"Application error: {e}")
         st.error("Please refresh the page or contact support if the issue persists.")
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     main()
