@@ -33,35 +33,42 @@ st.markdown("""
         margin-bottom: 1rem;
     }
     .prediction-box {
-        background-color: #f0f8ff;
+        background-color: #d1e7dd; /* Soft green background for better contrast */
         padding: 20px;
         border-radius: 10px;
         border-left: 5px solid #1f77b4;
         margin: 20px 0;
+        color: #0f5132; /* Dark green text for excellent readability */
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Added subtle shadow */
     }
     .risk-low {
-        background-color: #d4edda;
-        color: #155724;
+        background-color: #a7d4a7; /* Darker green for better contrast */
+        color: #0d4f0d; /* Darker text for visibility */
         padding: 10px;
         border-radius: 5px;
         border-left: 4px solid #28a745;
+        font-weight: bold;
     }
     .risk-medium {
-        background-color: #fff3cd;
-        color: #856404;
+        background-color: #ffeaa7; /* Soft yellow with good contrast */
+        color: #6c5500; /* Dark yellow text */
         padding: 10px;
         border-radius: 5px;
         border-left: 4px solid #ffc107;
+        font-weight: bold;
     }
     .risk-high {
-        background-color: #f8d7da;
-        color: #721c24;
+        background-color: #fab1a0; /* Soft coral background */
+        color: #721c24; /* Dark red text */
         padding: 10px;
         border-radius: 5px;
         border-left: 4px solid #dc3545;
+        font-weight: bold;
     }
 </style>
 """, unsafe_allow_html=True)
+
+
 
 def create_demo_model():
     """Create a simple demo model for deployment"""
@@ -141,7 +148,7 @@ def load_model_components():
         model = joblib.load('best_insurance_model.pkl')
         scaler = joblib.load('feature_scaler.pkl')
         encoders = joblib.load('label_encoders.pkl')
-        st.success("✅ Production model loaded successfully!")
+        
         return model, scaler, encoders
     except FileNotFoundError:
         # Create dummy components for demo purposes
